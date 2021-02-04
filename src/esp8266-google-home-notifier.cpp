@@ -56,15 +56,43 @@ boolean GoogleHomeNotifier::ip(IPAddress ip, const char *locale, uint16_t port)
   return true;
 }
 
-boolean GoogleHomeNotifier::notify(const char *phrase, WiFiClientSecure* pClient) {
-  return this->cast(phrase, nullptr, pClient);
+boolean GoogleHomeNotifier::notify(const char *phrase, WiFiClientSecure *pClient)
+{
+  if (this->cast(pClient) && phrase != nullptr)
+  {
+    tts.setWiFiClientSecure(m_client);
+    String speechUrl = tts.getSpeechUrl(phrase, m_locale);
+    delay(1);
+
+    if (speechUrl.indexOf("https://") == 0)
+    {
+      return this->play(speechUrl.c_str(), pClient);
+    }
+    this->setLastError("Failed to get TTS url.");
+  }
+  disconnect();
+  return false;
 }
 
-boolean GoogleHomeNotifier::play(const char *mp3Url, WiFiClientSecure* pClient) {
-  return this->cast(nullptr, mp3Url, pClient);
+boolean GoogleHomeNotifier::play(const char *mp3Url, WiFiClientSecure *pClient)
+{
+  if (this->cast(pClient) && mp3Url != nullptr)
+  {
+    delay(1);
+    if (this->_play(mp3Url))
+    {
+      disconnect();
+      return true;
+    }
+    char error[128];
+    sprintf(error, "Failed to play mp3 file. (%s)", this->getLastError());
+    this->setLastError(error);
+  }
+  disconnect();
+  return false;
 }
 
-boolean GoogleHomeNotifier::cast(const char *phrase, const char *mp3Url, WiFiClientSecure* pClient)
+boolean GoogleHomeNotifier::cast(WiFiClientSecure* pClient)
 {
   char error[128];
   if((this->m_ipaddress[0] == 0 && this->m_ipaddress[1] == 0 && this->m_ipaddress[2] == 0 && this->m_ipaddress[3] == 0) || this->m_port == 0) {
@@ -82,30 +110,7 @@ boolean GoogleHomeNotifier::cast(const char *phrase, const char *mp3Url, WiFiCli
 #endif
     m_clientCreated = true;
   }
-  if (phrase != nullptr) {
-    tts.setWiFiClientSecure(m_client);
-    speechUrl = tts.getSpeechUrl(phrase, m_locale);
-    delay(1);
-
-    if (speechUrl.indexOf("https://") != 0) {
-      this->setLastError("Failed to get TTS url.");
-      if (m_clientCreated == true) {
-        delete m_client;
-        m_client = nullptr;
-      }
-      return false;
-    }
-  } else if (mp3Url != nullptr) {
-    speechUrl = mp3Url;
-  } else {
-    this->setLastError("Both TTS phrase and mp3 url are nullptr.");
-    if (m_clientCreated == true) {
-      delete m_client;
-      m_client = nullptr;
-    }
-    return false;
-  }
-
+ 
   delay(1);
 #if defined(ARDUINO_ARCH_ESP8266) && !defined(ARDUINO_ESP8266_RELEASE_BEFORE_THAN_2_5_0)
   m_client->setInsecure();
@@ -116,7 +121,7 @@ boolean GoogleHomeNotifier::cast(const char *phrase, const char *mp3Url, WiFiCli
     disconnect();
     return false;
   }
-  
+
   delay(1);
   if( this->connect() != true) {
     sprintf(error, "Failed to Open-Session. (%s)", this->getLastError());
@@ -124,16 +129,6 @@ boolean GoogleHomeNotifier::cast(const char *phrase, const char *mp3Url, WiFiCli
     disconnect();
     return false;
   }
-   
-  delay(1);
-  if( this->_play(speechUrl.c_str()) != true) {
-    sprintf(error, "Failed to play mp3 file. (%s)", this->getLastError());
-    this->setLastError(error);
-    disconnect();
-    return false;
-  }
-
-  disconnect();
   return true;
 }
 
@@ -153,22 +148,22 @@ boolean GoogleHomeNotifier::sendMessage(const char *sourceId, const char *destin
 
   message.protocol_version = extensions_api_cast_channel_CastMessage_ProtocolVersion_CASTV2_1_0;
   message.source_id.funcs.encode = &(GoogleHomeNotifier::encode_string);
-  message.source_id.arg = (void*)sourceId;
+  message.source_id.arg = (void *)sourceId;
   message.destination_id.funcs.encode = &(GoogleHomeNotifier::encode_string);
-  message.destination_id.arg = (void*)destinationId;
+  message.destination_id.arg = (void *)destinationId;
   message.namespace_str.funcs.encode = &(GoogleHomeNotifier::encode_string);
-  message.namespace_str.arg = (void*)ns;
+  message.namespace_str.arg = (void *)ns;
   message.payload_type = extensions_api_cast_channel_CastMessage_PayloadType_STRING;
   message.payload_utf8.funcs.encode = &(GoogleHomeNotifier::encode_string);
-  message.payload_utf8.arg = (void*)data;
+  message.payload_utf8.arg = (void *)data;
 
-  uint8_t* buf = nullptr;
+  uint8_t *buf = nullptr;
   uint32_t bufferSize = 0;
   uint8_t packetSize[4];
   boolean status;
 
-  pb_ostream_t  stream;
-  
+  pb_ostream_t stream;
+
   do
   {
     if (buf) {
@@ -179,7 +174,7 @@ boolean GoogleHomeNotifier::sendMessage(const char *sourceId, const char *destin
 
     stream = pb_ostream_from_buffer(buf, bufferSize);
     status = pb_encode(&stream, extensions_api_cast_channel_CastMessage_fields, &message);
-  } while(status == false && bufferSize < 10240);
+  } while (status == false && bufferSize < 10240);
   if (status == false) {
     char error[128];
     sprintf(error, "Failed to encode. (source_id=%s, destination_id=%s, namespace=%s, data=%s)", sourceId, destinationId, ns, data);
@@ -189,7 +184,7 @@ boolean GoogleHomeNotifier::sendMessage(const char *sourceId, const char *destin
 
   bufferSize = stream.bytes_written;
   for(int i=0;i<4;i++) {
-    packetSize[3-i] = (bufferSize >> 8*i) & 0x000000FF;
+    packetSize[3 - i] = (bufferSize >> 8 * i) & 0x000000FF;
   }
   m_client->write(packetSize, 4);
   m_client->write(buf, bufferSize);
@@ -249,26 +244,26 @@ boolean GoogleHomeNotifier::connect()
     m_client->read(pcktSize, 4);
     message_length = 0;
     for(int i=0;i<4;i++) {
-      message_length |= pcktSize[i] << 8*(3 - i);
+      message_length |= pcktSize[i] << 8 * (3 - i);
     }
     m_client->read(buffer, message_length);
     istream = pb_istream_from_buffer(buffer, message_length);
 
     imsg.source_id.funcs.decode = &(GoogleHomeNotifier::decode_string);
-    imsg.source_id.arg = (void*)"sid";
+    imsg.source_id.arg = (void *)"sid";
     imsg.destination_id.funcs.decode = &(GoogleHomeNotifier::decode_string);
-    imsg.destination_id.arg = (void*)"did";
+    imsg.destination_id.arg = (void *)"did";
     imsg.namespace_str.funcs.decode = &(GoogleHomeNotifier::decode_string);
-    imsg.namespace_str.arg = (void*)"ns";
+    imsg.namespace_str.arg = (void *)"ns";
     imsg.payload_utf8.funcs.decode = &(GoogleHomeNotifier::decode_string);
-    imsg.payload_utf8.arg = (void*)"body";
+    imsg.payload_utf8.arg = (void *)"body";
     /* Fill in the lucky number */
 
     if (pb_decode(&istream, extensions_api_cast_channel_CastMessage_fields, &imsg) != true){
       this->setLastError("Incoming message decoding");
       return false;
     }
-    String json = String((char*)imsg.payload_utf8.arg);
+    String json = String((char *)imsg.payload_utf8.arg);
     int pos = -1;
 
     // if the incoming message has the transportId, then break;
@@ -314,14 +309,14 @@ void GoogleHomeNotifier::disconnect() {
   }
 }
 
-bool GoogleHomeNotifier::encode_string(pb_ostream_t *stream, const pb_field_t *field, void * const *arg)
+bool GoogleHomeNotifier::encode_string(pb_ostream_t *stream, const pb_field_t *field, void *const *arg)
 {
-  char *str = (char*) *arg;
+  char *str = (char *)*arg;
 
   if (!pb_encode_tag_for_field(stream, field))
     return false;
 
-  return pb_encode_string(stream, (uint8_t*)str, strlen(str));
+  return pb_encode_string(stream, (uint8_t *)str, strlen(str));
 }
 
 bool GoogleHomeNotifier::decode_string(pb_istream_t *stream, const pb_field_t *field, void **arg)
@@ -338,7 +333,7 @@ bool GoogleHomeNotifier::decode_string(pb_istream_t *stream, const pb_field_t *f
   /* Print the string, in format comparable with protoc --decode.
     * Format comes from the arg defined in main().
     */
-  *arg = (void***)buffer;
+  *arg = (void ***)buffer;
   return true;
 }
 

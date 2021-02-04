@@ -59,7 +59,7 @@ private:
   void disconnect();
   void setLastError(const char *lastError);
   boolean sendMessage(const char *sourceId, const char *destinationId, const char *ns, const char *data);
-  boolean cast(const char *phrase, const char *mp3Url, WiFiClientSecure* pClient = nullptr);
+  boolean cast(WiFiClientSecure* pClient = nullptr);
 
 public:
   boolean ip(IPAddress ip, const char *locale = "en", uint16_t port = 8009);
