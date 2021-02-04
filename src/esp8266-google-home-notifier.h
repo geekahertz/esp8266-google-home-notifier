@@ -55,7 +55,7 @@ private:
   static bool encode_string(pb_ostream_t *stream, const pb_field_t *field, void * const *arg);
   static bool decode_string(pb_istream_t *stream, const pb_field_t *field, void **arg);
   boolean connect();
-  boolean _play(const char *mp3url);
+  boolean sendConnect();
   void disconnect();
   void setLastError(const char *lastError);
   boolean sendMessage(const char *sourceId, const char *destinationId, const char *ns, const char *data);

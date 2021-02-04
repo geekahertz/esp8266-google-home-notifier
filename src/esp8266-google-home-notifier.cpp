@@ -76,19 +76,23 @@ boolean GoogleHomeNotifier::notify(const char *phrase, WiFiClientSecure *pClient
 
 boolean GoogleHomeNotifier::play(const char *mp3Url, WiFiClientSecure *pClient)
 {
-  if (this->cast(pClient) && mp3Url != nullptr)
+  if (this->cast(pClient) && mp3Url != nullptr && this->sendConnect())
   {
     delay(1);
-    if (this->_play(mp3Url))
+     // send URL of mp3
+    sprintf(data, CASTV2_DATA_LOAD, mp3Url);
+    if (this->sendMessage(this->m_clientid, this->m_transportid, CASTV2_NS_MEDIA, data))
     {
+      delay(1);
       disconnect();
       return true;
     }
-    char error[128];
-    sprintf(error, "Failed to play mp3 file. (%s)", this->getLastError());
-    this->setLastError(error);
+    this->setLastError("'LOAD' message encoding");
   }
   disconnect();
+  char error[128];
+  sprintf(error, "Failed to play mp3 file. (%s)", this->getLastError());
+  this->setLastError(error);
   return false;
 }
 
@@ -278,20 +282,12 @@ boolean GoogleHomeNotifier::connect()
   return true;
 }
 
-boolean GoogleHomeNotifier::_play(const char *mp3url)
+boolean GoogleHomeNotifier::sendConnect()
 {
   // send 'CONNECT' again
   sprintf(data, CASTV2_DATA_CONNECT);
   if (this->sendMessage(this->m_clientid, this->m_transportid, CASTV2_NS_CONNECTION, CASTV2_DATA_CONNECT) != true) {
     this->setLastError("'CONNECT' message encoding");
-    return false;
-  }
-  delay(1);
-
-  // send URL of mp3
-  sprintf(data, CASTV2_DATA_LOAD, mp3url);
-  if (this->sendMessage(this->m_clientid, this->m_transportid, CASTV2_NS_MEDIA, data) != true) {
-    this->setLastError("'LOAD' message encoding");
     return false;
   }
   delay(1);
