@@ -194,13 +194,6 @@ boolean GoogleHomeNotifier::sendMessage(const char *sourceId, const char *destin
   m_client->write(buf, bufferSize);
   m_client->flush();
 
-  while (m_client && m_client->available())
-  {
-    char c = m_client->read();
-    Serial.print(c);
-  }
-  Serial.println("");
-
   delay(1);
   delete buf;
   return true;
