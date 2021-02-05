@@ -87,7 +87,7 @@ boolean GoogleHomeNotifier::play(const char *mp3Url, WiFiClientSecure *pClient)
       disconnect();
       return true;
     }
-    this->setLastError("'LOAD' message encoding");
+    this->setLastError("'LOAD autoplay' message encoding");
   }
   disconnect();
   char error[128];
@@ -193,6 +193,13 @@ boolean GoogleHomeNotifier::sendMessage(const char *sourceId, const char *destin
   m_client->write(packetSize, 4);
   m_client->write(buf, bufferSize);
   m_client->flush();
+
+  while (m_client && m_client->available())
+  {
+    char c = m_client->read();
+    Serial.print(c);
+  }
+  Serial.println("");
 
   delay(1);
   delete buf;
@@ -339,4 +346,95 @@ const char * GoogleHomeNotifier::getLastError() {
 
 void GoogleHomeNotifier::setLastError(const char* lastError) {
   sprintf(m_lastError, "%s", lastError);
+}
+
+boolean GoogleHomeNotifier::setVolume(const float vol, WiFiClientSecure *pClient)
+{
+  if (this->cast(pClient) && vol >= 0.0 && vol <= 1.0 && this->sendConnect())
+  {
+    // send VOL
+    sprintf(data, CASTV2_DATA_SETVOL, vol);
+    Serial.println(data);
+    if (this->sendMessage(SOURCE_ID, DESTINATION_ID, CASTV2_NS_RECEIVER, data))
+    {
+      delay(1);
+      disconnect();
+      return true;
+    }
+    this->setLastError("'SET_VOLUME' message encoding");
+  }
+  disconnect();
+  return false;
+}
+
+boolean GoogleHomeNotifier::stop(WiFiClientSecure *pClient)
+{
+  if (this->cast(pClient) && this->sendConnect())
+  {
+    sprintf(data, CASTV2_DATA_STOP);
+    Serial.println(data);
+    if (this->sendMessage(SOURCE_ID, DESTINATION_ID, CASTV2_NS_RECEIVER, data))
+    {
+      delay(1);
+      disconnect();
+      return true;
+    }
+    this->setLastError("'STOP' message encoding");
+  }
+  disconnect();
+  return false;
+}
+
+boolean GoogleHomeNotifier::pause(WiFiClientSecure *pClient)
+{
+  if (this->cast(pClient) && this->sendConnect())
+  {
+    sprintf(data, CASTV2_DATA_PAUSE);
+    Serial.println(data);
+    if (this->sendMessage(SOURCE_ID, DESTINATION_ID, CASTV2_NS_RECEIVER, data))
+    {
+      delay(1);
+      disconnect();
+      return true;
+    }
+    this->setLastError("'PAUSE' message encoding");
+  }
+  disconnect();
+  return false;
+}
+
+boolean GoogleHomeNotifier::play(WiFiClientSecure *pClient)
+{
+  if (this->cast(pClient) && this->sendConnect())
+  {
+    sprintf(data, CASTV2_DATA_PLAY);
+    Serial.println(data);
+    if (this->sendMessage(SOURCE_ID, DESTINATION_ID, CASTV2_NS_RECEIVER, data))
+    {
+      delay(1);
+      disconnect();
+      return true;
+    }
+    this->setLastError("'PLAY' message encoding");
+  }
+  disconnect();
+  return false;
+}
+
+boolean GoogleHomeNotifier::status(WiFiClientSecure *pClient)
+{
+  if (this->cast(pClient) && this->sendConnect())
+  {
+    sprintf(data, CASTV2_DATA_STATUS);
+    Serial.println(data);
+    if (this->sendMessage(SOURCE_ID, DESTINATION_ID, CASTV2_NS_RECEIVER, data))
+    {
+      delay(1);
+      disconnect();
+      return true;
+    }
+    this->setLastError("'STATUS' message encoding");
+  }
+  disconnect();
+  return false;
 }
