@@ -72,6 +72,7 @@ public:
   boolean device(const char *name, const char *locale = "en", int to = 10000);
   boolean notify(const char *phrase, WiFiClientSecure* pClient = nullptr);
   boolean play(const char *mp3Url, WiFiClientSecure* pClient = nullptr);  // aka. load with autoplay
+  boolean sendCommand(const char* command, WiFiClientSecure* pClient = nullptr, const char *sourceId = SOURCE_ID, const char *destinationId = DESTINATION_ID, const char *ns = CASTV2_NS_RECEIVER);
   boolean setVolume(const float vol, WiFiClientSecure* pClient = nullptr);
   boolean stop(WiFiClientSecure* pClient = nullptr);
   boolean pause(WiFiClientSecure* pClient = nullptr);  // not working
