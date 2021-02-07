@@ -2,9 +2,9 @@
 
 char data[1024];
 
-boolean GoogleHomeNotifier::device(const char *name, const char *locale, int to)
+boolean GoogleHomeNotifier::device(const char *name, const char *locale, long unsigned to)
 {
-  int timeout = millis() + to;
+  long unsigned timeout = millis() + to;
   int n;
   char hostString[32];
 #ifdef ARDUINO_ARCH_ESP8266
@@ -76,23 +76,23 @@ boolean GoogleHomeNotifier::notify(const char *phrase, WiFiClientSecure *pClient
 
 boolean GoogleHomeNotifier::play(const char *mp3Url, WiFiClientSecure *pClient)
 {
-  if (this->cast(pClient) && mp3Url != nullptr && this->sendConnect())
+  if (mp3Url != nullptr)
   {
-    delay(1);
-     // send URL of mp3
+    // send URL of mp3
     sprintf(data, CASTV2_DATA_LOAD, mp3Url);
-    if (this->sendMessage(this->m_clientid, this->m_transportid, CASTV2_NS_MEDIA, data))
-    {
+    if (this->sendCommand(data, pClient, this->m_clientid, this->m_transportid, CASTV2_NS_MEDIA)) {
       delay(1);
-      disconnect();
+      String msg = receiveMessage("\"mediaSessionId\"");
+      int startPos = msg.indexOf("\"mediaSessionId\"") + 17;
+      int endPos = msg.indexOf(",", startPos);
+      sprintf(this->m_mediaSessionId, "%s", msg.substring(startPos, endPos).c_str());
       return true;
     }
-    this->setLastError("'LOAD autoplay' message encoding");
+    disconnect();
+    return false;
   }
   disconnect();
-  char error[128];
-  sprintf(error, "Failed to play mp3 file. (%s)", this->getLastError());
-  this->setLastError(error);
+  this->setLastError("Invalid mp3 file.");
   return false;
 }
 
@@ -108,6 +108,9 @@ boolean GoogleHomeNotifier::cast(WiFiClientSecure* pClient)
     m_client = pClient;
     m_clientCreated = false;
   } else if(!m_client) {
+#ifdef DEBUG
+  Serial.println("Create new m_client.");
+#endif    
     m_client = new WiFiClientSecure();
 #if defined(ARDUINO_ARCH_ESP8266) && !defined(ARDUINO_ESP8266_RELEASE_BEFORE_THAN_2_5_0)
     m_client->setInsecure();
@@ -148,6 +151,10 @@ const uint16_t GoogleHomeNotifier::getPort()
 
 boolean GoogleHomeNotifier::sendMessage(const char *sourceId, const char *destinationId, const char *ns, const char *data)
 {
+#ifdef DEBUG
+  Serial.print("sendMessage() - ");
+  Serial.println(data);
+#endif
   extensions_api_cast_channel_CastMessage message = extensions_api_cast_channel_CastMessage_init_default;
 
   message.protocol_version = extensions_api_cast_channel_CastMessage_ProtocolVersion_CASTV2_1_0;
@@ -215,71 +222,91 @@ boolean GoogleHomeNotifier::connect()
   }
   delay(1);
 
-  // send 'LAUNCH'
-  sprintf(data, CASTV2_DATA_LAUNCH, APP_ID);
-  if (this->sendMessage(SOURCE_ID, DESTINATION_ID, CASTV2_NS_RECEIVER, data) != true) {
-    this->setLastError("'LAUNCH' message encoding");
-    return false;
+  if (strcmp(this->m_transportid, "") == 0) {
+    // send 'LAUNCH'
+    char command[128];
+    sprintf(command, CASTV2_DATA_LAUNCH, APP_ID);
+    if (this->sendMessage(SOURCE_ID, DESTINATION_ID, CASTV2_NS_RECEIVER, command) != true) {
+      this->setLastError("'LAUNCH' message encoding");
+      return false;
+    }
+    delay(1);
+    // if the incoming message has appId & the transportId, then break :
+    // String("\"appId\":\"") + APP_ID + "\"") >= 0 && (pos = json.indexOf("\"transportId\":")) >= 0
+    String msg = receiveMessage("\"transportId\":");
+    if (strcmp(msg.c_str(), "") == 0) {
+      return false;
+    }
+    int pos = msg.indexOf("\"transportId\":");
+    sprintf(this->m_transportid, "%s", msg.substring(pos + 15, pos + 51).c_str());
+    sprintf(this->m_clientid, "client-%lu", millis());
+#ifdef DEBUG
+    Serial.print("  m_transportid - ");
+    Serial.println(this->m_transportid);
+#endif
+    delay(1);
   }
   delay(1);
-
-  // waiting for 'PONG' and Transportid
-  int timeout = (int)millis() + 5000;
-  while (m_client->available() == 0) {
-    if (timeout < millis()) {
-      this->setLastError("Listening timeout");
-      return false;
-    }
-  }
-  timeout = (int)millis() + 30000;
-  extensions_api_cast_channel_CastMessage imsg;
-  pb_istream_t istream;
-  uint8_t pcktSize[4];
-  uint8_t buffer[1024];
-
-  uint32_t message_length;
-  while(true) {
-    delay(100);
-    if (millis() > timeout) {
-      this->setLastError("Incoming message decoding");
-      return false;
-    }
-    // read message from Google Home
-    m_client->read(pcktSize, 4);
-    message_length = 0;
-    for(int i=0;i<4;i++) {
-      message_length |= pcktSize[i] << 8 * (3 - i);
-    }
-    m_client->read(buffer, message_length);
-    istream = pb_istream_from_buffer(buffer, message_length);
-
-    imsg.source_id.funcs.decode = &(GoogleHomeNotifier::decode_string);
-    imsg.source_id.arg = (void *)"sid";
-    imsg.destination_id.funcs.decode = &(GoogleHomeNotifier::decode_string);
-    imsg.destination_id.arg = (void *)"did";
-    imsg.namespace_str.funcs.decode = &(GoogleHomeNotifier::decode_string);
-    imsg.namespace_str.arg = (void *)"ns";
-    imsg.payload_utf8.funcs.decode = &(GoogleHomeNotifier::decode_string);
-    imsg.payload_utf8.arg = (void *)"body";
-    /* Fill in the lucky number */
-
-    if (pb_decode(&istream, extensions_api_cast_channel_CastMessage_fields, &imsg) != true){
-      this->setLastError("Incoming message decoding");
-      return false;
-    }
-    String json = String((char *)imsg.payload_utf8.arg);
-    int pos = -1;
-
-    // if the incoming message has appId & the transportId, then break;
-    if (json.indexOf(String("\"appId\":\"") + APP_ID + "\"") >= 0 &&
-        (pos = json.indexOf("\"transportId\":")) >= 0
-        ) {
-      sprintf(this->m_transportid, "%s", json.substring(pos + 15, pos + 51).c_str());
-      break;
-    }
-  }
-  sprintf(this->m_clientid, "client-%lu", millis());
   return true;
+}
+
+String GoogleHomeNotifier::receiveMessage(const char *keyword, const unsigned long timeLimit) {
+  // waiting for 'PONG' and Transportid
+    unsigned long timeout = millis() + timeLimit;
+    while (m_client->available() == 0) {
+      if (timeout < millis()) {
+        this->setLastError("Listening timeout");
+        return "";
+      }
+    }
+    
+    timeout = millis() + timeLimit;
+    extensions_api_cast_channel_CastMessage imsg;
+    pb_istream_t istream;
+    uint8_t pcktSize[4];
+    uint8_t buffer[1024];
+
+    uint32_t message_length;
+    String json;
+    while(true) {
+      delay(100);
+      if (millis() > timeout) {
+        this->setLastError("Incoming message decoding");
+        return "";
+      }
+      // read message from Google Home
+      m_client->read(pcktSize, 4);
+      message_length = 0;
+      for(int i=0;i<4;i++) {
+        message_length |= pcktSize[i] << 8 * (3 - i);
+      }
+      m_client->read(buffer, message_length);
+      istream = pb_istream_from_buffer(buffer, message_length);
+
+      imsg.source_id.funcs.decode = &(GoogleHomeNotifier::decode_string);
+      imsg.source_id.arg = (void *)"sid";
+      imsg.destination_id.funcs.decode = &(GoogleHomeNotifier::decode_string);
+      imsg.destination_id.arg = (void *)"did";
+      imsg.namespace_str.funcs.decode = &(GoogleHomeNotifier::decode_string);
+      imsg.namespace_str.arg = (void *)"ns";
+      imsg.payload_utf8.funcs.decode = &(GoogleHomeNotifier::decode_string);
+      imsg.payload_utf8.arg = (void *)"body";
+      /* Fill in the lucky number */
+
+      if (pb_decode(&istream, extensions_api_cast_channel_CastMessage_fields, &imsg) != true){
+        this->setLastError("Incoming message decoding");
+        return "";
+      }
+      json = String((char *)imsg.payload_utf8.arg);
+#ifdef DEBUG
+      Serial.print("receiveMessage() - ");
+      Serial.println(json);
+#endif
+      if (json.indexOf(keyword) >= 0) {
+        break;
+      }
+    }
+    return json;
 }
 
 boolean GoogleHomeNotifier::sendConnect()
@@ -296,6 +323,11 @@ boolean GoogleHomeNotifier::sendConnect()
 
 void GoogleHomeNotifier::disconnect() {
   if (m_client) {
+#ifdef DEBUG
+  Serial.println("Disconnect();");
+#endif
+    strcpy(this->m_clientid, "");
+    strcpy(this->m_transportid, "");
     if (m_client->connected()) m_client->stop();
     if (m_clientCreated == true) {
       delete m_client;
@@ -343,10 +375,10 @@ void GoogleHomeNotifier::setLastError(const char* lastError) {
 boolean GoogleHomeNotifier::sendCommand(const char* command, WiFiClientSecure *pClient, const char *sourceId, const char *destinationId, const char *ns) {
    if (this->cast(pClient) && this->sendConnect())
   {
+    delay(1);
     if (this->sendMessage(sourceId, destinationId, ns, command))
     {
       delay(1);
-      disconnect();
       return true;
     }
     this->setLastError("message encoding");
@@ -357,27 +389,29 @@ boolean GoogleHomeNotifier::sendCommand(const char* command, WiFiClientSecure *p
 
 boolean GoogleHomeNotifier::setVolume(const float vol, WiFiClientSecure *pClient)
 {
-    char command[128];
-    sprintf(command, CASTV2_DATA_SETVOL, vol);
-    return this->sendCommand(command);
+    sprintf(data, CASTV2_DATA_SETVOL, vol);
+    return this->sendCommand(data, pClient, SOURCE_ID, DESTINATION_ID, CASTV2_NS_RECEIVER);
 }
 
 boolean GoogleHomeNotifier::stop(WiFiClientSecure *pClient)
 {
-  return this->sendCommand(CASTV2_DATA_STOP);
+  return this->sendCommand(CASTV2_DATA_STOP, pClient, SOURCE_ID, DESTINATION_ID, CASTV2_NS_RECEIVER);
 }
 
 boolean GoogleHomeNotifier::pause(WiFiClientSecure *pClient)
 {
-  return this->sendCommand(CASTV2_DATA_PAUSE);
+    sprintf(data, CASTV2_DATA_PAUSE, this->m_mediaSessionId);
+  return this->sendCommand(data, pClient, this->m_clientid, this->m_transportid, CASTV2_NS_MEDIA);
 }
 
 boolean GoogleHomeNotifier::play(WiFiClientSecure *pClient)
 {
-  return this->sendCommand(CASTV2_DATA_PLAY);
+  sprintf(data, CASTV2_DATA_PLAY, this->m_mediaSessionId);
+  return this->sendCommand(data, pClient, this->m_clientid, this->m_transportid, CASTV2_NS_MEDIA);
 }
 
-boolean GoogleHomeNotifier::status(WiFiClientSecure *pClient)
+String GoogleHomeNotifier::status(WiFiClientSecure *pClient)
 {
-  return this->sendCommand(CASTV2_DATA_STATUS);
+  this->sendCommand(CASTV2_DATA_STATUS, pClient, this->m_clientid, this->m_transportid, CASTV2_NS_MEDIA);
+  return receiveMessage("\"type\":\"MEDIA_STATUS\"");
 }
