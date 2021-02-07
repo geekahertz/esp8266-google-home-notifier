@@ -37,56 +37,55 @@ void setup() {
   Serial.print(ghn.getPort());
   Serial.println(")");
   
-  WiFiClientSecure* pClient;
-  // Set volume
+    // Set volume
   Serial.println("* Set volume");
-  if (ghn.setVolume(0.3, pClient) != true) {
+  if (ghn.setVolume(0.3) != true) {
     Serial.println(ghn.getLastError());
     return;
   }
   delay(2000);
   // // Say hello world
   Serial.println("* Hello, World!");
-  if (ghn.notify("Hello, World!", pClient) != true) {
+  if (ghn.notify("Hello, World!") != true) {
     Serial.println(ghn.getLastError());
     return;
   }
   delay(5000);
   // Load and autoplay mp3
   Serial.println("* Load mp3");
-  if (ghn.play("https://files.freemusicarchive.org/storage-freemusicarchive-org/music/ccCommunity/The_Kyoto_Connection/Wake_Up/The_Kyoto_Connection_-_09_-_Hachiko_The_Faithtful_Dog.mp3", pClient) != true) {
+  if (ghn.play("https://files.freemusicarchive.org/storage-freemusicarchive-org/music/ccCommunity/The_Kyoto_Connection/Wake_Up/The_Kyoto_Connection_-_09_-_Hachiko_The_Faithtful_Dog.mp3") != true) {
     Serial.println(ghn.getLastError());
     return;
   }
   delay(10000);
   // Set volume
   Serial.println("* Set volume");
-  if (ghn.setVolume(0.1, pClient) != true) {
+  if (ghn.setVolume(0.1) != true) {
     Serial.println(ghn.getLastError());
     return;
   }
   delay(2000);
   // Pause mp3
   Serial.println("* Pause mp3");
-  if (ghn.pause(pClient) != true) {
+  if (ghn.pause() != true) {
     Serial.println(ghn.getLastError());
     return;
   }
   delay(10000);
   // Continue play mp3
   Serial.println("* Continue to play mp3");
-  if (ghn.play(pClient) != true) {
+  if (ghn.play() != true) {
     Serial.println(ghn.getLastError());
     return;
   }
   delay(10000);
   // Status
   Serial.println("* Status");
-  Serial.println(ghn.status(pClient));
+  Serial.println(ghn.status());
   delay(2000);
   // Stop
   Serial.println("* Stop");
-  if (ghn.stop(pClient) != true) {
+  if (ghn.stop() != true) {
     Serial.println(ghn.getLastError());
     return;
   }
