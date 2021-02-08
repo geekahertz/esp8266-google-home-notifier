@@ -400,7 +400,7 @@ boolean GoogleHomeNotifier::stop(WiFiClientSecure *pClient)
 
 boolean GoogleHomeNotifier::pause(WiFiClientSecure *pClient)
 {
-    sprintf(data, CASTV2_DATA_PAUSE, this->m_mediaSessionId);
+  sprintf(data, CASTV2_DATA_PAUSE, this->m_mediaSessionId);
   return this->sendCommand(data, pClient, this->m_clientid, this->m_transportid, CASTV2_NS_MEDIA);
 }
 
@@ -408,6 +408,17 @@ boolean GoogleHomeNotifier::play(WiFiClientSecure *pClient)
 {
   sprintf(data, CASTV2_DATA_PLAY, this->m_mediaSessionId);
   return this->sendCommand(data, pClient, this->m_clientid, this->m_transportid, CASTV2_NS_MEDIA);
+}
+
+boolean GoogleHomeNotifier::seek(const GoogleHomeNotifier::resumeState state, const float currentTime, WiFiClientSecure *pClient)
+{
+  sprintf(data, CASTV2_DATA_SEEK, 
+    this->m_mediaSessionId, 
+    state == GoogleHomeNotifier::resumeState::PLAYBACK_PAUSE ? "\"resumeState\":\"PLAYBACK_PAUSE\"," :
+      GoogleHomeNotifier::resumeState::PLAYBACK_START ? "\"resumeState\":\"PLAYBACK_START\"," : "",
+    currentTime);
+  return this->sendCommand(data, pClient, this->m_clientid, this->m_transportid, CASTV2_NS_MEDIA);
+
 }
 
 String GoogleHomeNotifier::status(WiFiClientSecure *pClient)

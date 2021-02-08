@@ -39,11 +39,11 @@
 #define CASTV2_DATA_LAUNCH "{\"type\":\"LAUNCH\",\"appId\":\"%s\",\"requestId\":1}"
 // Cast command reference: https://developers.google.com/cast/docs/reference/messages#MediaComm
 #define CASTV2_DATA_LOAD "{\"type\":\"LOAD\",\"autoplay\":true,\"currentTime\":0,\"activeTrackIds\":[],\"repeatMode\":\"REPEAT_OFF\",\"media\":{\"contentId\":\"%s\",\"contentType\":\"audio/mp3\",\"streamType\":\"BUFFERED\"},\"requestId\":1}"
-#define CASTV2_DATA_SETVOL  "{\"type\":\"SET_VOLUME\",\"volume\":{\"level\":%4.2f},\"requestId\":1}"
+#define CASTV2_DATA_SETVOL  "{\"type\":\"SET_VOLUME\",\"volume\":{\"level\":%.2f},\"requestId\":1}"
 #define CASTV2_DATA_PAUSE "{\"type\":\"PAUSE\",\"mediaSessionId\":%s,\"requestId\":1}"
 #define CASTV2_DATA_PLAY "{\"type\":\"PLAY\",\"mediaSessionId\":%s,\"requestId\":1}"
+#define CASTV2_DATA_SEEK "{\"type\":\"SEEK\",\"mediaSessionId\":%s,%s\"currentTime\":%.3f,\"requestId\":1}"
 #define CASTV2_DATA_STOP "{\"type\":\"STOP\",\"requestId\":1}"
-// TODO: Seek
 #define CASTV2_DATA_STATUS "{\"type\":\"GET_STATUS\",\"requestId\":1}"
 
 typedef class GoogleHomeNotifier {
@@ -71,6 +71,10 @@ private:
   boolean cast(WiFiClientSecure* pClient = nullptr);
 
 public:
+ enum resumeState {
+    PLAYBACK_START,
+    PLAYBACK_PAUSE
+  };
   boolean ip(IPAddress ip, const char *locale = "en", uint16_t port = 8009);
   boolean device(const char *name, const char *locale = "en", long unsigned to = 10000);
   void disconnect();
@@ -81,11 +85,12 @@ public:
   boolean stop(WiFiClientSecure* pClient = nullptr);
   boolean pause(WiFiClientSecure* pClient = nullptr);
   boolean play(WiFiClientSecure* pClient = nullptr);
+  boolean seek(const resumeState state, const float currentTime, WiFiClientSecure* pClient = nullptr);
   String status(WiFiClientSecure* pClient = nullptr);
   const IPAddress getIPAddress();
   const uint16_t getPort();
   const char * getLastError();
-
+ 
 } GoogleHomeNotifier;
 
 #endif
