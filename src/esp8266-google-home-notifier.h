@@ -19,7 +19,7 @@
 
 #include <google-tts.h>
 
-// #define DEBUG 1
+// #define DEBUG 1  // uncomment to troubleshoot send & receive message
 
 #define LIB_NAME "GoogleHomeNotifier for ESP8266"
 #define LIB_VERSION "0.1"
@@ -90,7 +90,6 @@ public:
   const IPAddress getIPAddress();
   const uint16_t getPort();
   const char * getLastError();
- 
 } GoogleHomeNotifier;
 
 #endif

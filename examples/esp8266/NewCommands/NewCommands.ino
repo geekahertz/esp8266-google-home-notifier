@@ -80,7 +80,7 @@ void setup() {
   }
   delay(5000);
   // Status
-  Serial.println("* Status");
+  Serial.println("* Status - to check currentTime is ~20s");
   Serial.println(ghn.status());
   delay(2000);
   // Seek
@@ -90,7 +90,7 @@ void setup() {
     return;
   }
   // Status
-  Serial.println("* Status");
+  Serial.println("* Status - to confirm currentTime is forwarded to ~57s");
   Serial.println(ghn.status());
   delay(10000);
   // Stop

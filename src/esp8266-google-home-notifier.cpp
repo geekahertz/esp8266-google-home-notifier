@@ -246,7 +246,6 @@ boolean GoogleHomeNotifier::connect()
 #endif
     delay(1);
   }
-  delay(1);
   return true;
 }
 
